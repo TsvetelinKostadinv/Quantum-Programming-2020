@@ -125,3 +125,6 @@ This will get pretty `entangled`, pretty quickly. (I'm sorry, I had to do it)
     - Quantum cryptography - uses this phenomenon to develop new protocols of protected communication, in which the security of the data is guaranteed by the core principles of quantum mechanics.
     - Quantum information theory - greater archive capability, greater efficiency in data transportation(speed, lower losses)
     - Quantum calculations and algorithms - thanks to quantum entanglement new algorithms can be developed which take advantage.
+
+## Resources
+- http://theo.inrne.bas.bg/~mitov/QuantumInformation2020/QI_introductory_lecture.pdf
