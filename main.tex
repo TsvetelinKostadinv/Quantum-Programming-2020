@@ -1,0 +1,933 @@
+\documentclass[11pt,oneside,a4paper]{article}
+\usepackage[margin=2cm]{geometry}
+
+\usepackage[T1,T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\usepackage[english,bulgarian]{babel}
+\usepackage{biblatex}
+
+\usepackage{fancyhdr}
+\usepackage{footmisc}
+\usepackage{calc}
+
+\usepackage{float}
+\usepackage{caption}
+
+\usepackage{amsmath,amsthm,amssymb}
+\usepackage{mathtext}
+\usepackage{mathtools}
+
+\usepackage{array}
+
+\usepackage{braket}
+
+\input{Qcircuit}
+
+\newcommand{\figref}[1]{\figurename~\ref{#1}}
+
+\usepackage[unicode]{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,      
+    urlcolor=cyan,
+}
+
+\setlength\headheight{3.5em}
+\setlength\footskip{14pt}
+
+\addtolength{\footnotesep}{0.8em} \renewcommand{\thefootnote}{\textbf{\arabic{footnote}}}
+
+\addbibresource{cite.bib}
+
+\renewcommand*{\thesection}{\arabic{section}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{Алгоритъм за засичане и коригиране на грешки в квантови системи}
+\lhead{Цветелин Цецков}
+\rfoot{Page \thepage}
+
+\title{Тема по квантива информатика: \\ Алгоритъм за засичане и коригиране на грешки в квантови системи\\ Quantum Error Correction}
+\author{Цветелин Цецков ФН:82130 }
+\date{\today}
+
+\begin{document}
+
+\maketitle
+\tableofcontents
+\newpage
+
+\begin{abstract}
+При квантовите операции и пренос на състояния винаги е възможно да настъпи т.н. decoherence - от чисти състояния, представени с вектори, до нечисти състояния, представени от матрици на плътността. Или да останем в чисто състояние, но околната среда да "измери"\ състоянието вместо нас. Тогава спрямо Проекционният постулат системата ще премине със скок в ново състояние спрямо изчислителния базис.
+\end{abstract}
+
+\section{Класически подход}
+Можем да заемем подход от един от първите подходи за корекции на грешки в класическите компютри - да повторим бит няколко пъти\footnote{
+Класическите \href{https://en.wikipedia.org/wiki/Repetition_code}{Кодировки с повторение}. Основен принци, на които е повторението на един и същи бит разчитайки на факта, че повече на брой грешки са по-малко вероятни.
+}. Това не е проблем, ако нашето състояние е едно от базисните 
+$\ket{0}, \ket{1}, \ket{+}$ или $\ket{-}$.\\
+Ако кубитът, който кодираме е $\ket{\psi}\in\set{\ket{0}, \ket{1}, \ket{+}, \ket{-}}$. To нашата кодировка с повторение би изглеждала по следния начин:
+\begin{equation} \label{eq:copy_simple}
+    \ket{\phi} = \ket{\psi} \otimes \ket{\psi} \otimes \ket{\psi}
+\end{equation}
+Тази кодировка се основава на факта, че ако $p$ е вероятността за обръщане на един бит при преноста(или изчислението). То вероятността за:\\
+1 грешка е от порядъка на $p.(1-p).(1-p) \rightarrow p$ \\
+2 грешки е от порядъка на $p.p.(1-p) \rightarrow p^2$ \\
+3 грешки е от порядъка на $p.p.p \rightarrow p^3$
+
+\section{Преход към квантова система}
+Но обаче ако имаме произволно състояние $\ket{\psi} = \alpha\ket{0} + \beta\ket{1}$, то за него не бихме могли да приложим \eqref{eq:copy_simple}\footnote{
+Защото е в сила \href{https://en.wikipedia.org/wiki/No-cloning_theorem}{Теоремата}, че не можем да клонираме произволно състояние 
+}\\
+Трябва да се измисли начин, по който да можем да поправяме грешки в кодировката без да се налага да измерваме системата, или поне не директно, защото тогава ще се приложи Проекционният постулат и ще загубим състоянието.\\
+Вместо да правим:
+\begin{equation} \label{eq:copy_simple_not_working}
+    \ket{\phi} = \ket{\psi} \otimes \ket{\psi} \otimes \ket{\psi}
+\end{equation}
+
+\subsection{Кодировки на един кубит}
+Една от най-простите кодировки би била да използваме помощни битове, за да запазим състоянието.
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    \lstick{\ket{\psi}} 
+        & \ctrl{1} 
+        & \ctrl{2} 
+        & \qw 
+        & \rstick{\ket{\psi}}\\
+    \lstick{\ket{0}} 
+        & \targ 
+        & \qw
+        & \qw 
+        & \rstick{\ket{ans_1}}\\
+    \lstick{\ket{0}} 
+        & \qw 
+        & \targ
+        & \qw
+        & \rstick{\ket{ans_2}}\\
+    }
+\end{array}
+\end{math}
+    \caption{Примерно кодиране на неизвестно състояние $\ket{\psi}$}
+    \label{fig:sample_coding}
+\end{figure}
+Ако $\ket{\psi} = \alpha\ket{0} + \beta\ket{1}$, то след кодировката получаваме:
+\begin{equation}
+    \ket{\phi} = \alpha\ket{000} + \beta\ket{111} \neq \ket{\psi} \otimes \ket{\psi} \otimes \ket{\psi}
+\end{equation}
+Нека за пълнота приемем $\ket{\psi} = \alpha\ket{0} + \beta\ket{1}$ и изпишем матрицата на кодировката.
+\paragraph{Нека преди това да припомним матриците на трансформациите}
+Както и операциите, които прилагаме към трансформациите, за да можем да ги приложим към нашия "квантов регистър"\footnote{
+В аналог с класическите компютри този термин ще бъде използван за съставна система от 2 или повече кубита
+}
+\begin{equation}
+    CNOT =\begin{bmatrix}
+    1 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 1\\
+    0 & 0 & 1 & 0
+    \end{bmatrix}
+    ,\;
+    SWAP = \begin{bmatrix}
+    1 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0\\
+    0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 1
+    \end{bmatrix}
+    \label{eq:cnot_and_swap_matrices}
+\end{equation}
+Матриците на използваните операции в \figref{fig:sample_coding}(на нея се вижда само $CNOT$ операцията, но когато изпишем алгоритъма в явен вид ще стане ясно, че се ползва и $SWAP$ операцията)
+
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    & \gate{U} & \gate{W} & \qw \\
+    }
+\end{array}
+\end{math}
+    \caption{Последнователно прилагане на операции}
+    \label{fig:sequential_gates_rule}
+\end{figure}
+Тогава тази операция може да се замести с една единствена получена по правилото: $R = W.U$
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    & \gate{R = W.U} & \qw \\
+    }
+\end{array}
+\end{math}
+    \caption{Последнователно прилагане на операции}
+    \label{fig:sequential_gates_rule_res}
+\end{figure}
+Когато обаче се случи да имаме операции, които действат само върху част от квантовия регистър:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    & \gate{U} & \qw \\
+    & \gate{W} & \qw \\
+    }
+\end{array}
+\end{math}
+    \caption{Паралелно прилагане на операции}
+    \label{fig:parallel_gates}
+\end{figure}
+Тогава можем да заместим двете с трансформация която действа едновременно и на двата кубита по правилото: $R = U \otimes\footnote{
+С този символ означаваме тензорно произведение между 2 матрици. Още наричано  \href{https://en.wikipedia.org/wiki/Kronecker_product}{произведение на Кронекер}
+} W$
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    & \multigate{1}{R = U \otimes W} & \qw \\
+    & \ghost{R = U \otimes W} & \qw \\
+    }
+\end{array}
+\end{math}
+    \caption{Паралелно прилагане на операции}
+    \label{fig:parallel_gates_res}
+\end{figure}
+\paragraph{Явен вид на кодировката}
+Сега е необходимо да изпишем по-подробно предишната схема от \figref{fig:sample_coding} във \figref{fig:sample_coding_expanded}.
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+    \lstick{\ket{\psi}} 
+        & \ctrl{1} 
+        & \qswap
+        & \gate{I \footnotemark}
+        & \qswap
+        & \qw 
+        & \rstick{\ket{\psi}}\\
+    \lstick{\ket{0}} 
+        & \targ 
+        & \qswap \qwx
+        & \ctrl{1} 
+        & \qswap \qwx
+        & \qw 
+        & \rstick{\ket{ans_1}}\\
+    \lstick{\ket{0}} 
+        & \gate{I}
+        & \gate{I}
+        & \targ
+        & \gate{I}
+        & \qw
+        & \rstick{\ket{ans_2}}\\
+    }
+\end{array}
+\end{math}
+    \caption{Примерно кодиране на неизвестно състояние $\ket{\psi}$}
+    \label{fig:sample_coding_expanded}
+\end{figure}
+\footnotetext{
+Използваме $I$ като операцията идентитет - не осъществява никаква трансформация и има матрица $\big[\begin{smallmatrix}1&0\\0&1\end{smallmatrix}\big]$
+}
+Това ще ни помогне да видим кои операции ще са ни необходими(ако построяваме и физически) и какви операции трябва да приложим между матриците на трансформациите. В случая множеството $\set{I, CNOT, SWAP}$ е напълно достатъчно, за да построим нашият алгоритъм.\\
+Така можем да изведем формула за нашата кодировка\footnote{
+Избраното име на трансформацията идва от анг. "encode" - кодирам, от там и кодировка. Прието е да се изписват имената на трансформациите на латиница с латински букви, за да има консистентност поне между чертежи, докато текстовете са различни.
+}:
+\begin{equation}
+    ENCODE_1 = 
+    \underbrace{(SWAP \otimes I)}_\text{Четвърта колона}
+    .
+    \underbrace{(I \otimes CNOT)}_\text{Трета колона}
+    .
+    \underbrace{(SWAP \otimes I)}_\text{Втора колона}
+    .
+    \underbrace{(CNOT \otimes I)}_\text{Първа колона}
+\label{eq:encode_matrix_formula}
+\end{equation}
+
+\eqref{eq:encode_matrix_formula} представлява формула за изчисление на матрицата на нашата кодировка(за един кубит). Замествайки стойностите от \eqref{eq:cnot_and_swap_matrices} в нея получаваме "кодировъчната матрица":
+\begin{equation} 
+    ENCODE_1 = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0
+    \end{bmatrix}
+    \label{eq:encode_matrix_res}
+\end{equation}
+От сега нататък $ENCODE_1$ ще бъде използвана като кодировка на 3 кубита по метода обяснен по-горе.\\
+Интересното на тази кодировка е, че посредством тези $CNOT$ операции, цялата система става "entangled"(преплетена). Именно от този феномен идва всеизветната фраза на Айнщайн - "spooky action at a distance", тъй като ако измерим един кубит на системата веднага ще знаем стойността на другите два. \cite{AE-MB-letters}
+\paragraph{Примерни изчисления с кодировъчната матрица}
+Ще извършим кодировка на всеки от базисните вектори на състоянията и в правоъгълния базис\footnote{
+Прието е правоъгълният базис да се състои от $\set{\ket{1}, \ket{0}}$
+}, и диагоналния\footnote{
+Диагоналния базис се състои от $\set{\ket{+}, \ket{-}}$, който може да се получи от правоъгълния по следния начин $\ket{\pm} = \frac{1}{\sqrt{2}}\ket{0} \pm \frac{1}{\sqrt{2}}\ket{1}$
+}
+\begin{equation}
+    \ket{0} = \begin{pmatrix}1\\0\end{pmatrix}
+\end{equation}
+НЕ можем просто така да приложим $ENCODE_1$ върху $\ket{0}$, защотое само един кубит, докато $ENCODE_1$ действа върху 3. Затова конструираме състояние $\ket{000} = \ket{0} \otimes \ket{0} \otimes \ket{0}$
+\begin{equation}
+    \ket{000} = \ket{0} \otimes \ket{0} \otimes \ket{0} = \begin{pmatrix}1\\0\end{pmatrix} \otimes \begin{pmatrix}1\\0\end{pmatrix} \otimes \begin{pmatrix}1\\0\end{pmatrix} = 
+    \begin{pmatrix}1\\0\\0\\0\\0\\0\\0\\0\end{pmatrix}
+\end{equation}
+\begin{equation}
+    ENCODE_1 . \ket{000} = ENCODE_1 .
+    \begin{pmatrix}1\\0\\0\\0\\0\\0\\0\\0\end{pmatrix} = 
+    \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0
+    \end{bmatrix} . \begin{pmatrix}1\\0\\0\\0\\0\\0\\0\\0\end{pmatrix}
+    = \begin{pmatrix}1\\0\\0\\0\\0\\0\\0\\0\end{pmatrix} = \ket{000}
+    \label{eq:simple_encode_000}
+\end{equation}
+Разглеждаме случая за $\ket{1}$
+\begin{equation}
+    \ket{1} = \begin{pmatrix}0\\1\end{pmatrix}
+\end{equation}
+Аналогично не можем да приложим кодировъчната матрица, затова конструираме състоянието $\ket{4}\footnote{
+С цел по-кратък запис можем да използваме десетичния запис на квантовия регистър когато това е възможно, напр $\ket{101} = \ket{5}$
+} = \ket{100} = \ket{1} \otimes \ket{0} \otimes \ket{0}$
+\begin{equation}
+    \ket{4} = \ket{100} = \ket{1} \otimes \ket{0} \otimes \ket{0} = \begin{pmatrix}0\\1\end{pmatrix} \otimes \begin{pmatrix}1\\0\end{pmatrix} \otimes \begin{pmatrix}1\\0\end{pmatrix} = \begin{pmatrix}0\\0\\0\\0\\1\\0\\0\\0\end{pmatrix}
+\end{equation}
+\begin{equation}
+    ENCODE_1 . \ket{100} = ENCODE_1 .
+    \begin{pmatrix}0\\0\\0\\0\\1\\0\\0\\0\end{pmatrix} = 
+    \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0
+    \end{bmatrix} . \begin{pmatrix}0\\0\\0\\0\\1\\0\\0\\0\end{pmatrix}
+    = \begin{pmatrix}0\\0\\0\\0\\0\\0\\0\\1\end{pmatrix} = \ket{111} = \ket{7}
+    \label{eq:simple_encode_100}
+\end{equation}
+Сега за диагоналния базис:
+\begin{equation}
+    \ket{+} = \frac{\ket{0} + \ket{1}}{\sqrt{2}} = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\end{pmatrix}
+\end{equation}
+\begin{equation}
+    \ket{+00} = \ket{+} \otimes \ket{0} \otimes \ket{0} = 
+    \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\end{pmatrix}
+    \otimes \begin{pmatrix}1\\0\end{pmatrix}
+    \otimes \begin{pmatrix}1\\0\end{pmatrix}
+    = \frac{1}{\sqrt{2}} \begin{pmatrix}1\\1\\0\\0\\0\\0\\0\\0\end{pmatrix} 
+    = \frac{1}{\sqrt{2}}\ket{000} + \frac{1}{\sqrt{2}}\ket{001}
+\end{equation}
+\begin{equation}
+\begin{multlined}
+    ENCODE_1 . \ket{+00} = ENCODE_1 .
+    \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \\
+    = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0
+    \end{bmatrix} . \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \ket{+00}
+\end{multlined}
+\label{eq:simple_encode_+00}
+\end{equation}
+
+И последно случая:
+\begin{equation}
+    \ket{-} = \frac{\ket{0} - \ket{1}}{\sqrt{2}} = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\-1\end{pmatrix}
+\end{equation}
+\begin{equation}
+    \ket{-00} = \ket{-} \otimes \ket{0} \otimes \ket{0}
+    = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\-1\end{pmatrix}
+    \otimes \begin{pmatrix}1\\0\end{pmatrix}
+    \otimes \begin{pmatrix}1\\0\end{pmatrix} =
+    \frac{1}{\sqrt{2}} \begin{pmatrix}1\\-1\\0\\0\\0\\0\\0\\0\end{pmatrix}
+\end{equation}
+\begin{equation}
+\begin{multlined}
+    ENCODE_1 . \ket{-00} = ENCODE_1 .
+    \frac{1}{\sqrt{2}}\begin{pmatrix}1\\-1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \\
+    = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0
+    \end{bmatrix} . \frac{1}{\sqrt{2}}\begin{pmatrix}1\\-1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \frac{1}{\sqrt{2}}\begin{pmatrix}1\\-1\\0\\0\\0\\0\\0\\0\end{pmatrix} = \ket{-00}
+\end{multlined}
+\label{eq:simple_encode_-00}
+\end{equation}
+
+Интересно нещо, което можем да забележим е, че диагоналните базиси и $\ket{0}$ остават "същите", докато само $\ket{1}$ променя стойността си(вж. \eqref{eq:simple_encode_100})
+
+\subsection{За шума}
+Той може да бъде под най-различна форма и да "разстрои" нашето състояние по много начини. Може да бъде породен от множество фактори. Околната среда да "измери" нашето състояние и чрез проекционния посулат да загубим подготвеното състояние. Или пък от чисто състояние да го превърне в матрица на плътността, с която не е удобно да се работи за изчисления. Дори физическите трансформации, които прилагаме на кубита може да разстроят неговото състояние и да загубим нашите данни.\\\
+А относно каква форма могат да приемат тези изменения, те могат да бъдат
+\begin{enumerate}
+    \item \label{item:bitflip} Обръщане на бит\footnote{т.нар. bit-flip от класическите системи, където например дадена система $\alpha_1\alpha_2\alpha_3$ преминава в системата: $\alpha_1\overline{\alpha_2}\alpha_3$}
+    \item\label{item:phaseflip} Обръщане на фазa\footnote{
+    т. нар. phase-flip, когато състоянието $\alpha\ket{0} + \beta\ket{0}$ преминава в $\alpha\ket{0} - \beta\ket{0}$.
+    \label{ftnt:phase_flip}
+    }
+    \item\label{item:both} Линейна комбинация комбинация на \ref{item:bitflip} и \ref{item:phaseflip}
+\end{enumerate}
+В известен смисъл построения $ENCODE_1$ ни защитава само от \ref{item:bitflip}. Обаче ако се загледаме хубаво в обръщането на фазата можем да забележим, че обръщането на фазата в правоъгълния базис съответства на обръщане на бита в диагоналния, така че можем да продължим да изграждаме алгоритъма за корекция на грешки в правоъгълния базис и в последствие да го допълним и до диагонален базис, за да коригираме грешка и в него.\\\
+В крайната диаграма ще използваме следното означение за шума от околната среда и грешката по време на опeрациите
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=.7em {
+        & \qw
+        & \multigate{2}{Noise} 
+        & \qw \\
+    \lstick{\vdots} 
+        & \qw 
+        & \ghost{Noise} 
+        & \qw 
+        & \rstick{\vdots} \\
+    & \qw 
+        & \ghost{Noise}
+        & \qw\\
+    }
+\end{array}
+\end{math}
+    \caption{Означението, че системата преминава през шум}
+    \label{fig:noise_gate}
+\end{figure}
+
+\subsection{Декодиране на състоянието}
+\paragraph{В общия случай} получаваме неизвестно състояние
+\begin{equation}
+    \ket{\psi} = \alpha_1\ket{0} + \alpha_2\ket{1} + \alpha_3\ket{2} + \alpha_4\ket{3} + \alpha_5\ket{4} + \alpha_6\ket{5} + \alpha_6\ket{6} + \alpha_7\ket{7}
+\end{equation}
+След като знаем, че идващото състояние е получено чрез нашата кодировка, можем да сме сигурни, че е разложимо(или поне трябва да бъде). Затова можем да си го мислим като получено от даден кубит $\ket{\phi} = \alpha\ket{0} + \beta\ket{1}$\\
+Но не можем просто да започнем да измерваме, тъй като ще загубим информацията заради проекционния постулат. Затова е необходимо отново да включим т.нар. ancilla bits\footnote{
+Бит, който не допринася за изчислението, а е необходим само за засичането и поправянето на грешки. \href{https://en.wikipedia.org/wiki/Ancilla_bit}{Ancilla bit}
+}. Ще ги използваме да засечем грешките, които са възникнали и ще измерваме само тях, без да докосваме състоянието.
+
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=1em {
+    \lstick{}
+        & \ctrl{3}
+        & \qw 
+        & \ctrl{4}
+        & \qw 
+        & \qw \\
+    \lstick{\ket{\psi}} 
+        & \qw 
+        & \ctrl{2}
+        & \qw 
+        & \qw
+        & \qw \\
+    \lstick{}
+        & \qw 
+        & \qw 
+        & \qw
+        & \ctrl{2}
+        & \qw \\
+    \lstick{\ket{0}}
+        & \targ
+        & \targ
+        & \qw
+        & \qw 
+        & \qw 
+        & \rstick{\ket{x_1}}\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \targ
+        & \targ
+        & \qw 
+        & \rstick{\ket{x_2}}\\
+    }
+\end{array}
+\end{math}
+    \caption{Декодиране на полученото съсояние}
+    \label{fig:sample_decode}
+\end{figure}
+Сега можем да разсъждаваме за $\ket{x_1}$ и  $\ket{x_2}$\footnote{
+Тези разсъждения са взети от лекциите с цел пълнота на представянето.
+}.\\
+\begin{math}
+\ket{x_1,x_2} = \begin{cases}
+\ket{00} \rightarrow \text{Не правим нищо.} \\
+\ket{01} \rightarrow \text{Прилагаме Pauli-X\footnotemark на третия кубит.}\\
+\ket{10} \rightarrow \text{Прилагаме Pauli-X на втория кубит.}\\
+\ket{11} \rightarrow \text{Прилагаме Pauli-X на първия кубит.}\\
+\end{cases}
+\end{math}
+\footnotetext{
+\href{https://en.wikipedia.org/wiki/Quantum_logic_gate\#Pauli-X_gate}{Pauli-X} трансформацията, кръстена на Волфганг Паули. Представлява класическата $NOT$ операция и има матрица $\left[\begin{smallmatrix}0&1\\1&0\end{smallmatrix}\right]$
+}
+И това би проработило и би ни дало верен резултат. Нека разпишем случаите и да се убедим:
+\begin{enumerate}
+    \item $\ket{x_1,x_2} = \ket{00}: \ket{x_1} = 0 \rightarrow \ket{\psi_1} = \ket{\psi_2}$ и $\ket{x_2} = 0 \rightarrow \ket{\psi_2} = \ket{\psi_3}$\footnote{
+    Използваме $\ket{\psi_i}$ за означение на $i$-тия кубит в системата
+    }
+    \item $\ket{x_1,x_2} = \ket{01}: \ket{x_1} = 0 \rightarrow \ket{\psi_1} = \ket{\psi_2}$, но $\ket{x_2} = 1 \rightarrow \ket{\psi_1} \neq \ket{\psi_3} \rightarrow$ третия се различава от останалите
+    \item $\ket{x_1,x_2} = \ket{01}: \ket{x_1} = 1 \rightarrow \ket{\psi_1} \neq \ket{\psi_2}$ и $\ket{x_2} = 0 \rightarrow \ket{\psi_1} = \ket{\psi_3} \rightarrow$ втория се различава от останалите
+    \item $\ket{x_1,x_2} = \ket{11}: \ket{x_1} = 1 \rightarrow \ket{\psi_1} \neq \ket{\psi_2}$ и $\ket{x_2} = 0 \rightarrow \ket{\psi_1} \neq \ket{\psi_3} \rightarrow$ първия се различава от останалите
+\end{enumerate}
+Ако измерим кое да е от гореспоменатите спрямо проекционния постулат $\ket{\psi}$ ще премине със скок в съответното състояние, което преполагаемо имаме.\\
+Например, ако измерим $\ket{00}$ ще имаме информация, че всички битове са еднакви следователно ще имаме $\braket{000 + 111|\psi}$, аналогично ако $\ket{x_1,x_2} = \ket{01}$ то ще знаем\footnote{
+Под "знаем" се има предвид, че можем да разсъждаваме за нещо като за дадено.
+}, че първия и третия кубит на системата се различават и можем да проектираме $\braket{110+001|\psi}$ и вече се вижда всъщност от къде идва решението за прилагане на $Pauli-X$ към третия \cite{dirac}. Аналогично и с останалите случаи: проектираме върху линейната комбинация, за която сме сигурни, че представлява състоянието на квантовия регистър.
+
+\paragraph{Малка хитрина}
+Mожем да спестим няколко операции като всъщност се замислим какво ни трябва, а именно кубитът $\ket{\phi} = \alpha\ket{0} + \beta\ket{1}$ кодиран чрез $ENCODE_1$ и получен след шум като $\ket{\psi}$. Ако се интересуваме само от него можем да приложим операцията на Тофоли\footnote{
+\href{https://en.wikipedia.org/wiki/Toffoli_gate}{Гейта на Тофоли} е двойно контролирана $NOT$ операция с матрица: $ CCNOT = \begin{bmatrix}
+1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 \\
+0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+\end{bmatrix}$
+}
+и в крайна сметка да елимираме участието на ancilla битове и да обръщаме само $\ket{\psi}$(първия кубит в системата $\ket{\psi}$), ако е необходимо. И тогава нашият алгоритъм схематично ще изглежда така:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \ket{\psi}
+    \begin{cases}
+        \begin{array}{c}
+        \Qcircuit @C=1em @R=1em {
+        \lstick{}
+            & \ctrl{1}
+            & \ctrl{2}
+            & \qw
+            & \targ
+            & \qw 
+            & \rstick{\ket{\phi}}\\
+        \lstick{} 
+            & \targ
+            & \qw
+            & \qw 
+            & \ctrl{-1}
+            & \qw \\
+        \lstick{}
+            & \qw 
+            & \targ
+            & \qw
+            & \ctrl{-2}
+            & \qw 
+        }
+        \end{array}
+    \end{cases}
+\end{math}
+    \caption{Декодиране чрез операцията на Тофоли}
+    \label{fig:sample_decode_toffoli}
+\end{figure}
+Добавен бонус към това декодиране е, че правим по-малко операции, съответно намалява акумулирания шанс за грешка при прилагане на операциите. \\
+Сега за целите на изложението е необходимо да изпишем алгоритъма в явен вид и да пресметнем неговата матрица. Разписваме схемата \figref{fig:sample_decode_toffoli} и получаваме:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \ket{\psi}
+    \begin{cases}
+        \begin{array}{c}
+        \Qcircuit @C=1em @R=1em {
+        \lstick{}
+            & \ctrl{1}
+            & \qswap
+            & \gate{I} 
+            & \qswap 
+            & \targ
+            & \qw
+            & \rstick{\ket{\phi}}\\
+        \lstick{} 
+            & \targ
+            & \qswap \qwx
+            & \ctrl{1}
+            & \qswap \qwx
+            & \ctrl{-1}
+            & \qw \\
+        \lstick{}
+            & \gate{I} 
+            & \gate{I} 
+            & \targ
+            & \gate{I} 
+            & \ctrl{-2}
+            & \qw 
+        }
+        \end{array}
+    \end{cases}
+\end{math}
+    \caption{Декодиране чрез операцията на Тофоли(разписна версия)}
+    \label{fig:sample_decode_toffoli_expanded}
+\end{figure}
+Въпреки, че опрацията на Тофоли е дефинирана при:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c}
+    \Qcircuit @C=1em @R=1em {
+        & \ctrl{1} & \qw\\
+        & \ctrl{1} & \qw\\
+        & \targ & \qw
+    }
+    \end{array}
+\end{math}
+    \caption{Стандартната операция на Тофоли}
+    \label{fig:standard_op_Toffoli}
+\end{figure}
+Но много лесно можем да рапределяме "контролите"\footnote{
+Контролите на една операция са изобразени като точки на схемите и служат за обозначаване на това, че дадена операция се контролира от кубитът в линията, където е точката.
+}, където поискаме чрез умножение по $SWAP$ матрицата(отляво или отдясно) дадена в \eqref{eq:cnot_and_swap_matrices}. Често това не се отразява експлицитно, защото се счита, че винаги можем да преномерираме кубитовете в края и да получим желания резултат. С цел експицитност на изложението ще извършвам и тези операции, тъй като това допринася за яснота на цялостното разбиране. В случая резултата е очевитен:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \begin{array}{c c c}
+    \Qcircuit @C=1em @R=1em {
+        & \targ & \qw\\
+        & \ctrl{-1} & \qw\\
+        & \ctrl{-1} & \qw
+    }
+    & \iff &
+    \Qcircuit @C=1em @R=1em {
+        & \qswap
+        & \qw
+        & \ctrl{1} 
+        & \qw
+        & \qswap
+        & \qw\\
+        & \qswap \qwx
+        & \qswap
+        & \ctrl{1}
+        & \qswap
+        & \qswap \qwx
+        & \qw\\
+        & \qw
+        & \qswap \qwx
+        & \targ 
+        & \qswap \qwx
+        & \qw
+        & \qw
+    }
+    \end{array}
+\end{math}
+    \caption{Разписана модифицираната операция на Тофоли от \figref{fig:sample_decode_toffoli}}
+    \label{fig:toffolli_decode_expanded}
+\end{figure}
+\begin{equation}
+    NOTCC\footnotemark = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1 \\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0 \\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0 \\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0 
+    \end{bmatrix}
+    \label{eq:notcc_matrix}
+\end{equation}
+\footnotetext{
+Прави ни впечатление, че всъщност матрицата на $NOTCC$ не е много по-различна от тази на $CCNOT$, дори можем да забележим, че е просто "транспонирана по обратния диагонал"
+}
+След като за стандартната трансформация използвахме $CCNOT$ и нейните контроли са към "горните"\ кубитове, то логично можем да заключим, че можем да смятаме наименованието като всяка паралелна операция се поставя след "горната". Щом $CCNOT$ е Controlled-Controlled-NOT, то най-логичното наименованите на получената матрица е $NOTCC$ - NOT-Controlled-Controlled.\\
+След като имаме \eqref{eq:cnot_and_swap_matrices} и \eqref{eq:notcc_matrix} можем да пресметнем матрицата на $DECODE_1$ операцията от \figref{fig:sample_decode_toffoli_expanded}
+\begin{equation}
+    DECODE_1 = NOTCC . (SWAP \otimes I) . (I \otimes CNOT) . (SWAP \otimes I) . (CNOT \otimes I)
+    \label{eq:decode_matrix_formula}
+\end{equation}
+Сега извършваме операциите в \eqref{eq:decode_matrix_formula} и получаваме:
+\begin{equation}
+    DECODE_1 = \begin{bmatrix}
+    1 & 0 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 1 & 0 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 1 & 0 & 0 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 1 & 0 & 0 & 0\\
+    0 & 0 & 0 & 0 & 0 & 0 & 0 & 1\\
+    0 & 0 & 0 & 0 & 0 & 0 & 1 & 0\\
+    0 & 0 & 0 & 0 & 0 & 1 & 0 & 0\\
+    0 & 0 & 0 & 1 & 0 & 0 & 0 & 0
+    \end{bmatrix}
+\end{equation}
+\paragraph{Примерни изчисления с декодиращата матрица(проверка)}
+Сега, за да се уверим, че наистина това е матрицата на декодирането ще я приложим към резултатите от: \eqref{eq:simple_encode_000}, \eqref{eq:simple_encode_100}, \eqref{eq:simple_encode_+00}, \eqref{eq:simple_encode_-00}\\
+$DECODE_1$ приложено на резултата от \eqref{eq:simple_encode_000}
+\begin{equation}
+    DECODE_1 . \ket{000} = \ket{000}
+\end{equation}
+\begin{equation}
+    DECODE_1 . \ket{111} = \ket{100}
+\end{equation}
+\begin{equation}
+    DECODE_1 . \ket{+00} = \ket{+00}
+\end{equation}
+\begin{equation}
+    DECODE_1 . \ket{-00} = \ket{-00}
+\end{equation}
+Уверихме се, че декодира правилно изчислените състояния, какво ще получим обаче, ако получим системата $\ket{\psi} = \ket{011}$, бихме очаквали да има шум в първия кубит от системата(именно този, който ни интересува), затова прилагаме $DECODE_1$ и получаваме
+\begin{equation}
+    DECODE_1 . \ket{011} = \ket{111}
+\end{equation}
+И както можем да забележим първия кубит се обръща и получаваме това, което сме очаквали.\\
+Нека разгледаме по-особен случай $\ket{\psi} = \alpha\ket{010} + \beta\ket{101}$
+\begin{equation}
+    DECODE_1 . \ket{\psi} = \alpha\ket{010} + \beta\ket{110}
+\end{equation}
+Както е видно системата не прие състоянието, което бихме очаквали при пълно декориране, в случая получихме частично декодиране(само върху първия кубит в системата).
+
+\section{Недостатъци на метода}
+\paragraph{Phase-flip errors}
+Гореизложения метод(вж. \figref{fig:sample_coding} и \figref{fig:sample_decode_toffoli}) могат да засичат и коригират грешки от т. нар. тип "bit-flip errors", но могат да настъпят и "phase-flip errors"\footref{ftnt:phase_flip}. Затова е необходимо разглеждане на втори алгоритъм именно за този вид грешки. Ако разгледаме какво всъщност представляват "phase-flip" грешките:
+\begin{equation}
+    \alpha\ket{0} + \beta\ket{1} \xleftrightarrow{\text{Phase flip}} \alpha\ket{0} - \beta\ket{1}
+\end{equation}
+В частност:
+\begin{equation}
+    \ket{+} = \frac{1}{\sqrt{2}}\ket{0} + \frac{1}{\sqrt{2}}\ket{1} \xleftrightarrow{\text{Phase flip}} \frac{1}{\sqrt{2}}\ket{0} - \frac{1}{\sqrt{2}}\ket{1} = \ket{-}
+    \label{eq:phase_flip_diag_basis}
+\end{equation}
+От \eqref{eq:phase_flip_diag_basis} можем да забележим, че "phase-flip" грешката в правоъгълния базис може да се разглежда като "bit-flip" грешка в диагоналния. Следователно нашият алгоритъм трябва да "премине" от единия базис в другия. Можем да използваме квантовата Фурие трансформация\footnote{
+\href{https://en.wikipedia.org/wiki/Quantum_Fourier_transform}{Квантовата Фурие трансформация} ни позволява да преминаваме от единия базис в другия като ни предоставя формула за матрицата на трансформацията
+}, но за целите на кодиране и декодиране можем да използваме опростена схема с Хадамар трансформацията.
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \Qcircuit @C=1em @R=1em {
+        \lstick{\ket{\phi}}
+        & \ctrl{1} 
+        & \ctrl{2}
+        & \gate{H}
+        & \multigate{2}{NOISE}
+        & \gate{H}
+        & \ctrl{1} 
+        & \ctrl{2}
+        & \targ
+        & \qw
+        & \rstick{\ket{\phi}}\\
+        \lstick{\ket{0}}
+        & \targ 
+        & \qw
+        & \gate{H}
+        & \ghost{NOISE}
+        & \gate{H}
+        & \targ 
+        & \qw
+        & \ctrl{-1}
+        & \qw\\
+        \lstick{\ket{0}}
+        & \qw
+        & \targ
+        & \gate{H}
+        & \ghost{NOISE}
+        & \gate{H}
+        & \qw
+        & \targ
+        & \ctrl{-1}
+        & \qw
+    }
+    \end{math}
+    \caption{Схема за засичане и коригиране на phase-flip грешки}
+    \label{fig:phase_flip_encode_decode}
+\end{figure}
+Отново сме се възползвали от идеята, че се интересуваме само от първия кубит на системата, а не от ancilla битовете. Матриците на $ENCODE_{phase}$ и $DECODE_{phase}$ могат тривиално да бъдат изписани от горната схема, чрез пресмятания подобни на \eqref{eq:encode_matrix_formula} и \eqref{eq:decode_matrix_formula}
+\section{Кодировка на Шор} \cite{shor-code}
+\paragraph{История}
+Кодировката разработена от \href{https://en.wikipedia.org/wiki/Peter_Shor}{Питър Шор}. Чрез нея могат да се коригират произволни линейни комбинации грешки върху \emph{единствен} кубит. Подхода е подобен на съвременни кодировки, а именно подхода на разделяне между логически и физически еденици. При кодировката на Шор един логически кубит(с който правим изчисления) се представя чрез 9 физически кубита. Той съчетава двете гореизложени схеми. Неговата схема изглежда така:
+\begin{figure}[H]
+    \centering
+    \begin{math}
+    \Qcircuit @C=1em @R=1em {
+    \lstick{\ket{\phi}}
+        & \ctrl{3}
+        & \ctrl{6}
+        & \gate{H}
+        & \ctrl{1}
+        & \ctrl{2}
+        & \multigate{8}{NOISE}
+        & \ctrl{2}
+        & \ctrl{1}
+        & \targ
+        & \gate{H}
+        & \ctrl{6}
+        & \ctrl{3}
+        & \targ
+        & \qw
+        & \rstick{\ket{\phi}}\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \qw
+        & \ghost{NOISE}
+        & \qw
+        & \targ
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \ghost{NOISE}
+        & \targ
+        & \qw
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw\\
+    \lstick{\ket{0}}
+        & \targ
+        & \qw
+        & \gate{H}
+        & \ctrl{1}
+        & \ctrl{2}
+        & \ghost{NOISE}
+        & \ctrl{2}
+        & \ctrl{1}
+        & \targ
+        & \gate{H}
+        & \qw
+        & \targ
+        & \ctrl{-3}
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \qw
+        & \ghost{NOISE}
+        & \qw
+        & \targ
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \ghost{NOISE}
+        & \targ
+        & \qw
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \targ
+        & \gate{H}
+        & \ctrl{1}
+        & \ctrl{2}
+        & \ghost{NOISE}
+        & \ctrl{2}
+        & \ctrl{1}
+        & \targ
+        & \gate{H}
+        & \targ
+        & \qw
+        & \ctrl{-3}
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \qw
+        & \ghost{NOISE}
+        & \qw
+        & \targ
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw\\
+    \lstick{\ket{0}}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \targ
+        & \ghost{NOISE}
+        & \targ
+        & \qw
+        & \ctrl{-1}
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+        & \qw
+    }
+    \end{math}
+    \caption{Кодировка на Шор}
+    \label{fig:shors_encoding}
+\end{figure}
+Интересното, което може да се отбележи за тази кодировка е, че кубитовете на местата 0,3,6 се използват за засичане и коригиране на "phase-flip" грешки, а кубитовете по групи - (0,1,2), (3,4,5), (6,7,8) аналогично за "bit-flip" грешки. В общия случай кодировката на Шор може да се използва за грешки от вида на \figref{fig:noise_gate}:
+\begin{equation}
+    NOISE = c_1 . I + c_2 . \sigma_x  + c_3 . \sigma_y  + c_4 . \sigma_z
+\end{equation}
+Където $c_1, c_2, c_3 \in \mathbb{C}$ и
+\begin{equation}
+\begin{multlined}
+    \sigma_x = \begin{bmatrix}
+    0 & 1 \\
+    1 & 0
+    \end{bmatrix}\\
+    \sigma_y = \begin{bmatrix}
+    0 & -i \\
+    i & 0
+    \end{bmatrix}\\
+    \sigma_z = \begin{bmatrix}
+    1 & 0 \\
+    0 & -1
+    \end{bmatrix}\\
+\end{multlined}
+\label{eq:pauli_matrices}
+\end{equation}
+Съответно разглеждани: $\sigma_x$ - bit-flip, $\sigma_y$ - phase-flip, $\sigma_z$ - и двете
+\section{Заключение}
+Настоящата разработка разгледа кодировки на един логически кубит и подходи за откриване и поправяне на единични грешки в системите на същия този логически кубит. Необходимо е да се отбележи, че тази област е обект на продължителни разработки, съответно изложените методи могат да търпят промени с течение на времето и да бъдат усъвършенствани.\\
+Изчисленията и проверките на операциите бяха проведени на симулация на квантов компютър \cite{Simulation-Q}. Също така матричните изчисления бяха улеснени от математическия модул на същата тази симулация.
+\newpage
+\printbibliography[title=Цитирани ресурси]
+\end{document}
