@@ -12,6 +12,7 @@ Mainly:
 - notes during lectures(predominantly in English)
 - exercises
 - homeworks
+- my little paper on quantum error correction
 
 ## Resources
 - Course and notes site: http://theo.inrne.bas.bg/~mitov/QuantumInformation2020/?fbclid=IwAR3-Ov5L92-aYFm10N5Z65ItFtlEVhXJSzjSogsYhnFfY3b8CjbeaAyQjVM
